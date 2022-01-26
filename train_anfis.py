@@ -1,19 +1,42 @@
 import torch
-from torch.utils.data import TensorDataset, DataLoader
-from sklearn.model_selection import train_test_split
-from membership import make_anfis
-import experimental
+import argparse
 import load_model
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+import experimental
 import numpy as np
-import pickle as pk
-seed = 123
-np.random.seed(seed)
-import torch
-torch.manual_seed(seed)
+import pickle as pkl
+from membership import make_anfis
+from sklearn.model_selection import train_test_split
+from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 
+def get_args():
+    parser = argparse.ArgumentParser("FOX code for regression tasks")
+    parser.add_argument("-s", "--seed", type=int, default=123, 
+                        help="seed value for torch, numpy")
+    parser.add_argument("-d", "--dataset_name", type=str, 
+                        default="sepsis_cases_1", help="dataset name")
+    args = parser.parse_args()
+    
+    return args
+
+def set_seed(seed):
+    # 123 was used originally
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    
 class ClassifierDataset(Dataset):
+    def __init__(self, X_data, y_data):
+        self.X_data = X_data
+        self.y_data = y_data
 
+    def __getitem__(self, index):
+        return self.X_data[index], self.y_data[index]
+
+    def __len__(self):
+        return len(self.X_data)
+    
+class RegressorDataset(Dataset):
     def __init__(self, X_data, y_data):
         self.X_data = X_data
         self.y_data = y_data
@@ -76,31 +99,45 @@ def opt(dataset, n_feature, learning_rate, bs, file_name, columns_sel):
     model, scores = experimental.train_anfis_cat(model, train_data, val_data, optimizer,100)
     return model, scores
 
-dataset_name = 'sepsis_cases_1'
+def main(args):
+    dataset_name = args.dataset_name # 'sepsis_cases_1'
+    if dataset_name == 'sepsis_cases_1':
+            columns_sel = ['Diagnose', 'mean_open_cases', 'Age', 'std_Leucocytes', 'std_CRP']#sepsis_cases_1
+    elif dataset_name == 'sepsis_cases_2':
+            columns_sel = ['Diagnose', 'mean_open_cases', 'mean_hour', 'DisfuncOrg']#sepsis_cases_2
+    elif dataset_name == 'sepsis_cases_4':
+            columns_sel = ['Diagnose', 'mean_open_cases', 'Age', 'org:group_E', 'std_CRP', 'DiagnosticECG']#sepsis_cases_4
+    elif dataset_name == 'bpic2011_f1':
+            columns_sel = ['Diagnosis Treatment Combination ID', 'mean_open_cases', 'Diagnosis', 'Activity code_376400.0']#bpic2011_f1
+    elif dataset_name == 'bpic2011_f2':
+            columns_sel = ['Diagnosis Treatment Combination ID', 'Diagnosis', 'Diagnosis code', 'mean_open_cases', 'Activity code_376400.0', 'Age', 'Producer code_CHE1']#bpic2011_f2
+    elif dataset_name == 'bpic2011_f3':
+            columns_sel = ['Diagnosis Treatment Combination ID', 'Diagnosis', 'mean_open_cases', 'Diagnosis code', 'std_event_nr', 'mean_event_nr']#bpic2011_f3
+    elif dataset_name == 'bpic2011_f4':
+            columns_sel = ['Diagnosis Treatment Combination ID', 'Treatment code']#bpic2011_f4
+    elif dataset_name == 'bpic2012_accepted':
+            columns_sel = ['AMOUNT_REQ', 'Activity_O_SENT_BACK-COMPLETE', 'Activity_W_Valideren aanvraag-SCHEDULE', 'Activity_W_Valideren aanvraag-START']#bpic2012_accepted
+    elif dataset_name == 'bpic2012_declined':
+            columns_sel = ['AMOUNT_REQ', 'Activity_A_PARTLYSUBMITTED-COMPLETE', 'Activity_A_PREACCEPTED-COMPLETE', 'Activity_A_DECLINED-COMPLETE', 'Activity_W_Completeren aanvraag-SCHEDULE', 'mean_open_cases'] #bpic2012_declined
+    elif dataset_name == 'bpic2012_cancelled':
+            columns_sel = ['Activity_O_SENT_BACK-COMPLETE', 'Activity_W_Valideren aanvraag-SCHEDULE', 'Activity_W_Valideren aanvraag-START', 'AMOUNT_REQ', 'Activity_W_Valideren aanvraag-COMPLETE', 'Activity_A_CANCELLED-COMPLETE']#bpic2012_cancelled
+    elif dataset_name == 'production':
+            columns_sel = ['Work_Order_Qty', 'Activity_Turning & Milling - Machine 4', 'Resource_ID0998', 'Resource_ID4794', 'Resource.1_Machine 4 - Turning & Milling']#production
+    params = pkl.load(open('params/'+dataset_name+".p", "rb"))
+    print(f"running on dataset: {dataset_name}")
+    print("params:")
+    print(params)
+    n_features = len(columns_sel)
+    model = train(
+        dataset_name, 
+        n_features, 
+        params.get('lr'), 
+        params.get('batch_size'), 
+        columns_sel[:n_features]
+    )    
 
-if dataset_name == 'sepsis_cases_1':
-        columns_sel = ['Diagnose', 'mean_open_cases', 'Age', 'std_Leucocytes', 'std_CRP']#sepsis_cases_1
-elif dataset_name == 'sepsis_cases_2':
-        columns_sel = ['Diagnose', 'mean_open_cases', 'mean_hour', 'DisfuncOrg']#sepsis_cases_2
-elif dataset_name == 'sepsis_cases_4':
-        columns_sel = ['Diagnose', 'mean_open_cases', 'Age', 'org:group_E', 'std_CRP', 'DiagnosticECG']#sepsis_cases_4
-elif dataset_name == 'bpic2011_f1':
-        columns_sel = ['Diagnosis Treatment Combination ID', 'mean_open_cases', 'Diagnosis', 'Activity code_376400.0']#bpic2011_f1
-elif dataset_name == 'bpic2011_f2':
-        columns_sel = ['Diagnosis Treatment Combination ID', 'Diagnosis', 'Diagnosis code', 'mean_open_cases', 'Activity code_376400.0', 'Age', 'Producer code_CHE1']#bpic2011_f2
-elif dataset_name == 'bpic2011_f3':
-        columns_sel = ['Diagnosis Treatment Combination ID', 'Diagnosis', 'mean_open_cases', 'Diagnosis code', 'std_event_nr', 'mean_event_nr']#bpic2011_f3
-elif dataset_name == 'bpic2011_f4':
-        columns_sel = ['Diagnosis Treatment Combination ID', 'Treatment code']#bpic2011_f4
-elif dataset_name == 'bpic2012_accepted':
-        columns_sel = ['AMOUNT_REQ', 'Activity_O_SENT_BACK-COMPLETE', 'Activity_W_Valideren aanvraag-SCHEDULE', 'Activity_W_Valideren aanvraag-START']#bpic2012_accepted
-elif dataset_name == 'bpic2012_declined':
-        columns_sel = ['AMOUNT_REQ', 'Activity_A_PARTLYSUBMITTED-COMPLETE', 'Activity_A_PREACCEPTED-COMPLETE', 'Activity_A_DECLINED-COMPLETE', 'Activity_W_Completeren aanvraag-SCHEDULE', 'mean_open_cases'] #bpic2012_declined
-elif dataset_name == 'bpic2012_cancelled':
-        columns_sel = ['Activity_O_SENT_BACK-COMPLETE', 'Activity_W_Valideren aanvraag-SCHEDULE', 'Activity_W_Valideren aanvraag-START', 'AMOUNT_REQ', 'Activity_W_Valideren aanvraag-COMPLETE', 'Activity_A_CANCELLED-COMPLETE']#bpic2012_cancelled
-elif dataset_name == 'production':
-        columns_sel = ['Work_Order_Qty', 'Activity_Turning & Milling - Machine 4', 'Resource_ID0998', 'Resource_ID4794', 'Resource.1_Machine 4 - Turning & Milling']#production
-
-params = pk.load(open('params/'+dataset_name+".p", "rb"))
-n_features = len(columns_sel)
-model = train(dataset_name, n_features, params.get('lr'), params.get('batch_size'), columns_sel[:n_features])
+    
+if __name__ ==  "__main__":
+    args = get_args()
+    set_seed(args.seed)
+    main(args)

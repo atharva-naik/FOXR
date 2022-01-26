@@ -10,7 +10,7 @@ dtype = torch.float
 def make_one_hot(data, num_categories, dtype=torch.float):
     num_entries = len(data)
     # Convert data to a torch tensor of indices, with extra dimension:
-    cats = torch.Tensor(data).long().unsqueeze(1)
+    cats = torch.Tensor(data.cpu()).long().unsqueeze(1)
     # Now convert this to one-hot representation:
     y = torch.zeros((num_entries, num_categories), dtype=dtype)\
         .scatter(1, cats, 1)

@@ -179,6 +179,7 @@ class AntecedentLayer(torch.nn.Module):
         # Expand (repeat) the rule indices to equal the batch size:
         batch_indices = self.mf_indices.expand((x.shape[0], -1, -1))
         # Then use these indices to populate the rule-antecedents
+        batch_indices = batch_indices.to(x.device)
         ants = torch.gather(x.transpose(1, 2), 1, batch_indices)
         # ants.shape is n_cases * n_rules * n_in
         # Last, take the AND (= product) for each rule-antecedent
@@ -440,6 +441,7 @@ class AnfisNet(torch.nn.Module):
         self.raw_weights = self.layer['rules'](self.fuzzified)
         self.weights = F.normalize(self.raw_weights, p=1, dim=1)
         self.rule_tsk = self.layer['consequent'](x)
+        self.rule_tsk = self.rule_tsk.to(self.weights.device)
         
         y_pred = torch.bmm(self.rule_tsk, self.weights.unsqueeze(2))
         self.y_pred = y_pred.squeeze(2)
