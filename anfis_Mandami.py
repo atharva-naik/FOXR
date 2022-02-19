@@ -423,8 +423,10 @@ class AnfisNet(torch.nn.Module):
         #####################################################################
         rstr = []
         vardefs = self.layer['fuzzify'].varmfs
+        # print(vardefs)
+        # print(vardefs.x0.mfdefs)
         rule_ants = self.layer['rules'].extra_repr(vardefs).split('\n')
-
+        
         for i, crow in enumerate(lis):
             rstr.append('Rule {:2d}: IF {}'.format(i, rule_ants[i]))
             rstr.append(' ' * 9 + 'THEN {}'.format(crow.tolist()))
@@ -441,10 +443,13 @@ class AnfisNet(torch.nn.Module):
         self.raw_weights = self.layer['rules'](self.fuzzified)
         self.weights = F.normalize(self.raw_weights, p=1, dim=1)
         self.rule_tsk = self.layer['consequent'](x)
-        self.rule_tsk = self.rule_tsk.to(self.weights.device)
+        self.rule_tsk = self.rule_tsk.to(self.weights.device) # 256, 2, 243 (2 is for num_classes, 256: batch size, 243: num rules)
+        # print("x:", x.shape)
+        # print("rule_tsk:", self.rule_tsk.shape)
+        # print("weights:", self.weights.unsqueeze(2).shape)
+        y_pred = torch.bmm(self.rule_tsk, self.weights.unsqueeze(2)) # 243, 1 x num_rules
+        self.y_pred = y_pred.squeeze(2) # unnormalized logits
         
-        y_pred = torch.bmm(self.rule_tsk, self.weights.unsqueeze(2))
-        self.y_pred = y_pred.squeeze(2)
         return self.y_pred
 
 
